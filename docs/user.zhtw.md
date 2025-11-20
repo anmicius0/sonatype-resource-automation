@@ -1,23 +1,40 @@
-# API 使用手冊
+# 🚀 Repository Management API 使用手冊
 
-## 如何使用
+本手冊詳細說明如何透過 Repository Management API 進行儲存庫的建立、刪除和管理。
 
-1. **發送請求**：告訴 API 你要建立或刪除什麼。
-2. **取得 Job ID**：API 會回覆「收到，處理中」，並給你一個 ID。
-3. **查詢進度**：用這個 ID 來檢查工作是否完成。
+---
 
-## 身分驗證
+## 🔁 異步流程 (如何使用)
 
-你需要一組 Token 才能使用。請放在 Header 裡：
-`Authorization: Bearer <YOUR_API_TOKEN>`
+本 API 所有主要操作皆採用**異步 Job 模式**。
 
-## API 功能
+1.  **發送請求：** 告訴 API 你要建立或刪除什麼資源（例如：儲存庫）。
+2.  **取得 Job ID：** API 立即回傳一個獨特的 `JOB_ID`，狀態為 `pending` (處理中)。
+3.  **查詢進度：** 你可以使用 `JOB_ID` 來輪詢（Poll）狀態，直到工作完成（狀態為 `completed` 或 `failed`）。
+
+---
+
+## 🔒 身分驗證
+
+所有請求**皆需**通過身分驗證。你的 API Token 必須包含在 `Authorization` Header 中。
+
+| Header Key      | 值格式 (Value Format)     |
+| :-------------- | :------------------------ |
+| `Authorization` | `Bearer <YOUR_API_TOKEN>` |
+
+---
+
+## 🏗️ API 功能
 
 ### 1. 建立儲存庫
 
-**網址**: `POST /repositories`
+用於預置新的儲存庫並授予使用者存取權。
 
-**內容範例**:
+| 方法 (Method) | 網址 (URL)      |
+| :------------ | :-------------- |
+| `POST`        | `/repositories` |
+
+#### 請求內容範例
 
 ```json
 {
@@ -33,20 +50,102 @@
 }
 ```
 
+#### 建立規則 (Request Rules for Creation)
+
+`Shared` 和 `AppID` 的組合定義了正在配置的儲存庫存取類型。
+
+| 設定                 | `Shared = false` (專案特定)                      | `Shared = true` (共用存取)             |
+| :------------------- | :----------------------------------------------- | :------------------------------------- |
+| **`AppID`**          | **必填** (例如：`"my-app-001"`)                  | **必須為空** (`""`)                    |
+| **`PackageManager`** | **必填** (例如：`"npm"`, `"maven"`)              | **必填** (例如：`"npm"`, `"maven"`)    |
+| **效果**             | 為特定的 App (`AppID`) 建立專屬的儲存庫和 Role。 | 建立或分配使用者一般的共用儲存庫角色。 |
+
+---
+
 ### 2. 刪除儲存庫
 
-注意：範例 JSON 使用了與 Go struct 對應的正規化欄位名稱（首字母大寫）。解碼器對大小寫有一定容忍度，但建議使用範例中的欄位名稱，以避免混淆。
-**網址**: `DELETE /repositories`
+用於移除儲存庫和撤銷使用者存取權限。
 
-**內容範例**: 同上。
+| 方法 (Method) | 網址 (URL)      |
+| :------------ | :-------------- |
+| `DELETE`      | `/repositories` |
+
+#### 請求內容範例 (標準刪除)
+
+```json
+{
+  "Requests": [
+    {
+      "OrganizationName": "Department A",
+      "LdapUsername": "john.doe",
+      "PackageManager": "npm",
+      "Shared": false,
+      "AppID": "my-app-001"
+    }
+  ]
+}
+```
+
+#### 請求內容範例 (💀 下線 / 完整 App 清理 - Offboarding)
+
+```json
+{
+  "Requests": [
+    {
+      "OrganizationName": "Department A",
+      "LdapUsername": "john.doe",
+      "Shared": true,
+      "AppID": "my-app-001"
+    }
+  ]
+}
+```
+
+#### 刪除規則說明 (驗證非常嚴格)
+
+刪除端點支援兩種不同的模式。
+
+**模式 A：刪除特定 App 的儲存庫**
+
+| 欄位 (Field)     | 要求 (Requirement) | 效果 (Effect)                              |
+| :--------------- | :----------------- | :----------------------------------------- |
+| `Shared`         | `false`            | 刪除此特定儲存庫，並清除相關的使用者角色。 |
+| `AppID`          | **必填**           |                                            |
+| `PackageManager` | **必填**           |                                            |
+
+**模式 B：💀 下線 / 完整 App 清理（Offboarding）** (共用存取 & 完整清理)
+
+這是一個「下線模式」，會根據 `AppID` 執行更廣泛的清理。
+
+| 欄位 (Field)     | 要求 (Requirement)  | 效果 (Effect)                                                                                                      |
+| :--------------- | :------------------ | :----------------------------------------------------------------------------------------------------------------- |
+| `Shared`         | `true`              | 停用使用者，移除其命名的 Role，並刪除**所有**以 `-release-<AppID>` 結尾的儲存庫和權限，無論 Package Manager 為何。 |
+| `AppID`          | **必填**            |                                                                                                                    |
+| `PackageManager` | **必須為空** (`""`) |                                                                                                                    |
+
+> **IQ Server 影響：** 下線流程也會移除對應 `OrganizationName` 的 IQ Server 組織 Owner 角色，讓使用者在移除儲存庫與權限後同時失去該組織的 Owner 存取權。
+
+> **📌 注意：** API 會拒絕 `Shared=true` 且 `AppID` 為空的 `DELETE` 請求。如果您要移除某位使用者的共用存取權限，請使用**模式 B**（帶有 `AppID` 的下線流程）。
+
+---
 
 ### 3. 查詢進度
 
-**網址**: `GET /jobs/<JOB_ID>`
+用於擷取異步 Job 的當前狀態和統計資料。
 
-**回應範例 (完成時):**
+| 方法 (Method) | 網址 (URL)       |
+| :------------ | :--------------- |
+| `GET`         | `/jobs/<JOB_ID>` |
 
-`GET /jobs/<JOB_ID>` 會回傳完整 job 物件及統計資料。範例：
+#### 回傳狀態與欄位命名慣例
+
+| 屬性 (Property) | 詳細資訊                                                                           |
+| :-------------- | :--------------------------------------------------------------------------------- |
+| `status`        | 可能是：`pending`、`processing`、`completed`、`failed`。                           |
+| `action`        | 操作類型：`create` 或 `delete`。                                                   |
+| **大小寫**      | **回傳的屬性名稱一律為 `camelCase`** (例如：`successfulOperations`, `createdAt`)。 |
+
+#### 回應範例 (完成時)
 
 ```json
 {
@@ -75,24 +174,20 @@
 }
 ```
 
-注意：回傳的欄位名稱使用 camelCase（例如：`jobId`、`createdAt`、`successfulOperations`）。
+---
 
-補充資訊：
+## ⚙️ 關鍵限制與資料規則
 
-- `status`：可能是 `pending`、`processing`、`completed`、`failed`。
-- `action`：`create` 或 `delete`，表示工作執行的動作。
+- **請求中的欄位名稱區分大小寫 (Case-Sensitive)：** 請一律使用文件中指定的確切大小寫 (例如：`OrganizationName`、`LdapUsername`、`AppID`)。
+- **OrganizationName：** 必須與系統配置 (在 `config/organizations.json` 內) 的 Key **完全一樣**（區分大小寫）。
+- **PackageManager：** 必須是受支援的類型 (例如 `npm`、`maven`、`docker`)，並存在於 `config/packageManager.json` 中。
 
-## 重要規則
+---
 
-- **OrganizationName**: 必須跟系統設定完全一樣 (與 `config/organizations.json` 的 key 進行精確對照)。
-- **PackageManager**: 例如 `npm`, `maven`, `docker` — 必須存在於 `config/packageManager.json`。
-- **Shared (共用設定)**:
-  - 如果是 `true` (共用)：`AppID` 必須留空。
-  - 如果是 `false` (專案專用)：一定要填寫 `AppID`。
-  - 注意：`Requests` 項目中 `OrganizationName`、`LdapUsername`、`PackageManager` 為必要欄位。伺服器會檢查 `Shared` 與 `AppID` 的組合，若不合法會回傳 `422` 錯誤。
+## 🚨 常見 API 錯誤
 
-## 常見錯誤
-
-- **401 Unauthorized**: Token 錯了或沒帶。
-- **422 Unprocessable Entity**: 資料填錯了 (例如漏填欄位)。
-- **404 Not Found**: 找不到這個 Job ID (可能是伺服器重啟過)。
+| HTTP Code | 錯誤訊息               | 常見原因                                                                            |
+| :-------- | :--------------------- | :---------------------------------------------------------------------------------- |
+| **401**   | `Unauthorized`         | 缺少或使用了錯誤的 `Authorization: Bearer` Token。                                  |
+| **422**   | `Unprocessable Entity` | 請求的 JSON 格式錯誤，或違反了邏輯規則（例如在下線刪除時帶入了 `PackageManager`）。 |
+| **404**   | `Not Found`            | 找不到此 Job ID。（Job 儲存在內存中，伺服器重啟可能會清除）。                       |

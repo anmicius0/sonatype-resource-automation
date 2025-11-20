@@ -24,6 +24,12 @@ func NewIQServerCleaner(opConfig *config.OperationConfig, iqClient client.IQClie
 
 // CleanupUserFromOrganization removes the Owner role from the user in the organization.
 func (ic IQServerCleaner) CleanupUserFromOrganization() error {
+	if ic.opConfig.Shared && ic.opConfig.AppID != "" {
+		utils.WithComponent("iq_cleaner").Debug("Offboarding mode detected; including IQ Server owner cleanup",
+			zap.String("username", ic.opConfig.LdapUsername),
+			zap.String("app_id", ic.opConfig.AppID))
+	}
+
 	utils.WithComponent("iq_cleaner").Debug("Starting IQ Server user cleanup from organization",
 		zap.String("action", ic.opConfig.Action),
 		zap.String("username", ic.opConfig.LdapUsername),

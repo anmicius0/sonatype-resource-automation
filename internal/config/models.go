@@ -24,6 +24,10 @@ type OperationConfig struct {
 	RoleName string
 	// PackageManager is the package manager type (e.g., "npm", "maven", "docker")
 	PackageManager string
+	// Shared indicates if the operation is for a shared resource
+	Shared bool
+	// AppID is the application identifier (if applicable)
+	AppID string
 }
 
 // RepositoryRequest represents a single repository operation request from the API.
@@ -33,7 +37,9 @@ type RepositoryRequest struct {
 	// LdapUsername is the LDAP user who will receive roles on the repository
 	LdapUsername string `binding:"required"`
 	// PackageManager specifies the repository format (e.g., npm, maven2, docker)
-	PackageManager string `binding:"required"`
+	// Note: Required for Create operations, and Delete operations where Shared=false.
+	// Optional for Delete operations where Shared=true.
+	PackageManager string
 	// Shared indicates whether this repository is shared across applications
 	Shared bool
 	// AppID is the application identifier for non-shared repositories; must be empty for shared repositories

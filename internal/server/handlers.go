@@ -65,7 +65,7 @@ func (h *Handler) processBatch(c *gin.Context, action string) {
 	}
 
 	// Validate the request body format
-	validationResult := h.validateBatchRequest(batch)
+	validationResult := h.validateBatchRequest(batch, action)
 
 	// If all requests are invalid, return a validation failed response
 	if len(validationResult.ValidRequests) == 0 {
@@ -112,19 +112,54 @@ func authMiddleware(expectedToken string) gin.HandlerFunc {
 }
 
 // validateBatchRequest validates the individual requests in a batch.
-func (h *Handler) validateBatchRequest(batch batchRepositoryRequest) *ValidationResult {
+func (h *Handler) validateBatchRequest(batch batchRepositoryRequest, action string) *ValidationResult {
 	validationResult := &ValidationResult{
 		ValidRequests:   make([]config.RepositoryRequest, 0, len(batch.Requests)),
 		InvalidRequests: make([]ValidationError, 0, len(batch.Requests)),
 	}
 	for _, req := range batch.Requests {
-		if req.Shared && req.AppID != "" {
-			validationResult.InvalidRequests = append(validationResult.InvalidRequests, ValidationError{
-				Request: req,
-				Reasons: []string{"appid not allowed for shared repos"},
-			})
-			continue
+		// 1. Validate PackageManager
+		// Case A: Delete + Shared = Offboarding. PackageManager MUST be empty.
+		// Case B: All other cases. PackageManager MUST be present.
+		if action == MethodDelete && req.Shared {
+			if req.PackageManager != "" {
+				validationResult.InvalidRequests = append(validationResult.InvalidRequests, ValidationError{
+					Request: req,
+					Reasons: []string{"packageManager must be empty for shared delete operations"},
+				})
+				continue
+			}
+		} else {
+			if req.PackageManager == "" {
+				validationResult.InvalidRequests = append(validationResult.InvalidRequests, ValidationError{
+					Request: req,
+					Reasons: []string{"packageManager is required for this operation type"},
+				})
+				continue
+			}
 		}
+
+		// 2. Validate AppID/Shared Combinations
+		// If Action is Create: Shared=true MUST have Empty AppID.
+		// If Action is Delete: Shared=true MUST have AppID (Offboarding Mode).
+		if action == MethodCreate {
+			if req.Shared && req.AppID != "" {
+				validationResult.InvalidRequests = append(validationResult.InvalidRequests, ValidationError{
+					Request: req,
+					Reasons: []string{"appid not allowed for shared repos on create"},
+				})
+				continue
+			}
+		} else if action == MethodDelete {
+			if req.Shared && req.AppID == "" {
+				validationResult.InvalidRequests = append(validationResult.InvalidRequests, ValidationError{
+					Request: req,
+					Reasons: []string{"appid required for shared repos on delete (offboarding)"},
+				})
+				continue
+			}
+		}
+
 		if !req.Shared && req.AppID == "" {
 			validationResult.InvalidRequests = append(validationResult.InvalidRequests, ValidationError{
 				Request: req,

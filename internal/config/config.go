@@ -123,23 +123,36 @@ func (c Config) CreateOpConfig(r RepositoryRequest, action string) (*OperationCo
 		return nil, fmt.Errorf("organization '%s' not found", r.OrganizationName)
 	}
 
-	// Get Package Manager remote URL
-	manager, ok := c.PackageManagers[r.PackageManager]
-	if !ok {
-		return nil, fmt.Errorf("package manager '%s' not found", r.PackageManager)
-	}
-	remoteURL := manager.DefaultURL
+	var remoteURL string
+	var repoName string
+	var privilegeName string
 
-	// Generate Repository Name
-	suffix := r.AppID
-	if r.Shared {
-		suffix = "shared"
+	// Only attempt to resolve Package Manager details if PackageManager is provided.
+	// It may be empty for "Offboarding" delete requests.
+	if r.PackageManager != "" {
+		// Get Package Manager remote URL
+		manager, ok := c.PackageManagers[r.PackageManager]
+		if !ok {
+			return nil, fmt.Errorf("package manager '%s' not found", r.PackageManager)
+		}
+		remoteURL = manager.DefaultURL
+
+		// Generate Repository Name
+		// Logic: If AppID is present, use it. Otherwise, if Shared is true, use "shared".
+		suffix := r.AppID
+		if suffix == "" && r.Shared {
+			suffix = "shared"
+		}
+		repoName = fmt.Sprintf("%s-release-%s", strings.ToLower(r.PackageManager), suffix)
+		privilegeName = repoName
 	}
-	repoName := fmt.Sprintf("%s-release-%s", strings.ToLower(r.PackageManager), suffix)
 
 	// Determine Role Name
+	// Logic: If Shared=true AND AppID is empty, use "repositories.share".
+	// If Shared=true AND AppID is NOT empty (Special Delete Case), we target the User Role (r.LdapUsername).
+	// If Shared=false, we target the User Role (r.LdapUsername).
 	roleName := r.LdapUsername
-	if r.Shared {
+	if r.Shared && r.AppID == "" {
 		roleName = "repositories.share"
 	}
 
@@ -151,8 +164,10 @@ func (c Config) CreateOpConfig(r RepositoryRequest, action string) (*OperationCo
 		ExtraRoles:     c.ExtraRoles,
 		BaseRoles:      c.BaseRoles,
 		RepositoryName: repoName,
-		PrivilegeName:  repoName,
+		PrivilegeName:  privilegeName,
 		RoleName:       roleName,
 		PackageManager: r.PackageManager,
+		Shared:         r.Shared,
+		AppID:          r.AppID,
 	}, nil
 }

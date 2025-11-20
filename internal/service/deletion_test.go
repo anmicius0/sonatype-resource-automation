@@ -144,3 +144,112 @@ func TestCleanupUserRoles(t *testing.T) {
 		mockClient.AssertExpectations(t)
 	})
 }
+
+func TestDeletionManager_Run_OffboardingMode(t *testing.T) {
+	opConfig := &config.OperationConfig{
+		Action:         "delete",
+		Shared:         true,
+		AppID:          "app-123",
+		LdapUsername:   "offboard-user",
+		RepositoryName: "npm-release-app-123",
+		PrivilegeName:  "npm-release-app-123",
+		RoleName:       "offboard-user",
+		BaseRoles:      []string{"base-role"},
+		ExtraRoles:     []string{"extra-role"},
+	}
+
+	mockClient := new(MockNexusClient)
+	mockClient.On("GetUser", "offboard-user").Return(&client.User{Roles: []string{"some-role"}}, nil)
+	mockClient.On("UpdateUser", mock.MatchedBy(func(u *client.User) bool {
+		return u.Status == "disabled" && len(u.Roles) == 1 && u.Roles[0] == "base-role"
+	})).Return(nil)
+	mockClient.On("DeleteRole", "offboard-user").Return(nil)
+
+	// Mock listing repositories
+	mockClient.On("GetRepositories").Return([]client.Repository{
+		{Name: "npm-release-app-123"},
+		{Name: "maven-release-app-123"},
+		{Name: "other-repo"},
+	}, nil)
+
+	// Mock listing privileges
+	mockClient.On("GetPrivileges").Return([]client.Privilege{
+		{Name: "npm-release-app-123"},
+		{Name: "maven-release-app-123"},
+		{Name: "other-priv"},
+	}, nil)
+
+	// Mock deleting discovered resources
+	mockClient.On("DeleteRepository", "npm-release-app-123").Return(nil)
+	mockClient.On("DeleteRepository", "maven-release-app-123").Return(nil)
+	mockClient.On("DeletePrivilege", "npm-release-app-123").Return(nil)
+	mockClient.On("DeletePrivilege", "maven-release-app-123").Return(nil)
+
+	dm := NewDeletionManager(opConfig, mockClient)
+	result, err := dm.Run()
+
+	assert.NoError(t, err)
+	assert.Equal(t, "offboarding", result["mode"])
+	assert.Equal(t, "offboard-user", result["ldap_username"])
+	mockClient.AssertExpectations(t)
+}
+
+func TestDeletionManager_Run_SharedRoleCleanup(t *testing.T) {
+	opConfig := &config.OperationConfig{
+		Action:         "delete",
+		RoleName:       "repositories.share",
+		Shared:         true,
+		LdapUsername:   "shared-user",
+		OrganizationID: "org-id",
+		BaseRoles:      []string{"base-role"},
+		ExtraRoles:     []string{"extra-role"},
+	}
+
+	mockClient := new(MockNexusClient)
+	mockClient.On("GetUser", "shared-user").Return(&client.User{Roles: []string{"repositories.share", "extra-role"}}, nil)
+	mockClient.On("GetRole", "repositories.share").Return(&client.Role{Privileges: []string{}}, nil)
+	mockClient.On("UpdateUser", mock.MatchedBy(func(u *client.User) bool {
+		return len(u.Roles) == 1 && u.Roles[0] == "base-role"
+	})).Return(nil)
+
+	dm := NewDeletionManager(opConfig, mockClient)
+	result, err := dm.Run()
+
+	assert.NoError(t, err)
+	assert.Equal(t, "delete", result["action"])
+	assert.Equal(t, "shared-user", result["ldap_username"])
+	assert.Equal(t, "org-id", result["organization_id"])
+	mockClient.AssertExpectations(t)
+}
+
+func TestDeletionManager_Run_FullCleanup(t *testing.T) {
+	opConfig := &config.OperationConfig{
+		Action:         "delete",
+		RoleName:       "app-role",
+		RepositoryName: "app-role-repo",
+		PrivilegeName:  "app-role-repo",
+		LdapUsername:   "app-user",
+		OrganizationID: "org-b",
+		BaseRoles:      []string{"base-role"},
+		ExtraRoles:     []string{"extra-role"},
+	}
+
+	mockClient := new(MockNexusClient)
+	mockClient.On("DeleteRepository", "app-role-repo").Return(nil)
+	mockClient.On("DeletePrivilege", "app-role-repo").Return(nil)
+	mockClient.On("GetRole", "app-role").Return(nil, nil).Twice()
+	mockClient.On("GetUser", "app-user").Return(&client.User{Roles: []string{"app-role", "base-role"}}, nil)
+	mockClient.On("UpdateUser", mock.MatchedBy(func(u *client.User) bool {
+		return len(u.Roles) == 1 && u.Roles[0] == "base-role"
+	})).Return(nil)
+
+	dm := NewDeletionManager(opConfig, mockClient)
+	result, err := dm.Run()
+
+	assert.NoError(t, err)
+	assert.Equal(t, "delete", result["action"])
+	assert.Equal(t, "app-role-repo", result["repository_name"])
+	assert.Equal(t, "app-user", result["ldap_username"])
+	assert.Equal(t, "org-b", result["organization_id"])
+	mockClient.AssertExpectations(t)
+}

@@ -7,9 +7,11 @@ import "github.com/anmicius0/sonatype-resource-automation/internal/config"
 // interface.
 type NexusClient interface {
 	GetRepository(name string) (*Repository, error)
+	GetRepositories() ([]Repository, error)
 	CreateProxyRepository(config *config.OperationConfig) error
 	DeleteRepository(name string) error
 	GetPrivilege(name string) (*Privilege, error)
+	GetPrivileges() ([]Privilege, error)
 	CreatePrivilege(config *config.OperationConfig) error
 	DeletePrivilege(name string) error
 	GetRole(name string) (*Role, error)

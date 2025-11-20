@@ -41,6 +41,18 @@ func (c *nexusClient) GetRepository(name string) (*Repository, error) {
 	return &repo, nil
 }
 
+func (c *nexusClient) GetRepositories() ([]Repository, error) {
+	resp, err := c.DoReq("GET", "/v1/repositories", nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("get repositories: %w", err)
+	}
+	var repos []Repository
+	if err := json.Unmarshal(resp.Bytes(), &repos); err != nil {
+		return nil, fmt.Errorf("get repositories: failed to unmarshal response: %w", err)
+	}
+	return repos, nil
+}
+
 func (c *nexusClient) CreateProxyRepository(config *config.OperationConfig) error {
 	manager, ok := c.supportedFormats[strings.ToLower(config.PackageManager)]
 	if !ok {
@@ -113,6 +125,18 @@ func (c *nexusClient) GetPrivilege(name string) (*Privilege, error) {
 		return nil, fmt.Errorf("get privilege '%s': failed to unmarshal response: %w", name, err)
 	}
 	return &priv, nil
+}
+
+func (c *nexusClient) GetPrivileges() ([]Privilege, error) {
+	resp, err := c.DoReq("GET", "/v1/security/privileges", nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("get privileges: %w", err)
+	}
+	var privs []Privilege
+	if err := json.Unmarshal(resp.Bytes(), &privs); err != nil {
+		return nil, fmt.Errorf("get privileges: failed to unmarshal response: %w", err)
+	}
+	return privs, nil
 }
 
 func (c *nexusClient) CreatePrivilege(config *config.OperationConfig) error {

@@ -1,19 +1,19 @@
 # Sonatype Resource Automation (Go)
 
-An asynchronous API service for managing Nexus Repository Manager and Sonatype IQ Server resources — repositories, privileges, roles and user permissions — at scale.
+An asynchronous API service for managing Nexus Repository Manager and Sonatype IQ Server resources — repositories, privileges, roles, and user permissions — at scale.
 
-This service exposes a small HTTP API to submit batches of repository create/delete requests. Each request is processed asynchronously and idempotently and returns a job ID so you can poll for status while work runs in the background.
+This service exposes a small HTTP API to submit batches of repository create/delete requests. Each request is processed asynchronously and **idempotently** and returns a job ID so you can poll for status while work runs in the background.
 
 ## Table of contents
 
 - [Features](#features)
 - [Quick start](#quick-start)
-- [API](#api)
+- [API](#api-endpoints)
 - [Architecture & design](#architecture--design)
-- [Configuration](#configuration)
-- [Development & testing](#development--testing)
+- [Configuration Guide](#configuration-guide)
+- [Development & Building](#development--building)
 - [Runbook & maintenance](#runbook--maintenance)
-- [Troubleshooting](#troubleshooting)
+- [Troubleshooting & Logging](#troubleshooting--logging)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -32,16 +32,16 @@ Prerequisites:
 - Go 1.21+ (or the Go version used by this repo)
 - `make` (optional, for convenience)
 
-1. Copy the example env into `config/.env` and fill in credentials:
+1.  Copy the example env into `config/.env` and fill in credentials:
 
 ```bash
 cp config/.env.example config/.env
 # Edit values (NEXUS_URL, NEXUS_USERNAME, NEXUS_PASSWORD, IQSERVER_URL, etc.)
 ```
 
-2. Ensure `config/organizations.json` and `config/packageManager.json` contain the mappings you need. Example files are provided in `config/`.
+2.  Ensure `config/organizations.json` and `config/packageManager.json` contain the mappings you need. Example files are provided in `config/`.
 
-3. Run the server locally:
+3.  Run the server locally:
 
 ```bash
 go run main.go
@@ -75,11 +75,11 @@ go run main.go
 
 ## Adding a New Package Manager
 
-1. Edit `config/packageManager.json` and add a new object entry for the new format. The entry should include `defaultURL`, `apiEndpoint.path` and optionally `formatSpecificConfig` for Nexus specific fields.
+1.  Edit `config/packageManager.json` and add a new object entry for the new format. The entry should include `defaultURL`, `apiEndpoint.path` and optionally `formatSpecificConfig` for Nexus specific fields.
 
-2. Start the server and use a test request to verify repository creation via the new API endpoint.
+2.  Start the server and use a test request to verify repository creation via the new API endpoint.
 
-3. Add unit tests in `internal/client` or `internal/service` where applicable.
+3.  Add unit tests in `internal/client` or `internal/service` where applicable.
 
 ## Testing & CI
 
@@ -89,47 +89,47 @@ go run main.go
 go test ./...
 ```
 
-- Tests should cover both happy paths and error-handling for Nexus and IQ interactions. Use mocks to simulate upstream responses.
+- Tests should cover both **happy paths** and **error-handling** for Nexus and IQ interactions. Use mocks to simulate upstream responses.
 
 ## Troubleshooting Checklist
 
 When something fails:
 
-1. Check `app.log` for stack traces and failure details.
-2. Verify credentials in `config/.env` and upstream network connectivity to Nexus/IQ.
-3. Verify organization UUIDs in `config/organizations.json`.
-4. For flaky network issues, consider increasing timeouts or adding retry logic with backoff.
+1.  Check `app.log` for stack traces and failure details.
+2.  Verify credentials in `config/.env` and upstream network connectivity to Nexus/IQ.
+3.  Verify organization UUIDs in `config/organizations.json`.
+4.  For flaky network issues, consider increasing timeouts or adding retry logic with backoff.
 
 ## Monitoring & Metrics (Recommendations)
-
-## Maintenance Checklist (Quick)
-
-Use this checklist for common maintenance tasks during deployments and on-call rotations.
-
-1. Verify config values and secrets in `config/.env`.
-2. Validate `config/organizations.json` and `config/packageManager.json` contain required mappings.
-3. Deploy service and confirm it starts without errors.
-4. Check the health endpoint and ensure the server responds.
-5. Tail logs and look for unexpected errors or high error rates.
-6. If the JobStore is reset, re-run any necessary job submission tests.
-
-## Credential Rotation
-
-1. Update credentials in `config/.env` for Nexus, IQ, or API token.
-2. Restart the service (or use rolling restart in clustered environments).
-3. Confirm successful API calls to Nexus/IQ in logs and that jobs run successfully.
-
-## Handling a Production Incident (high level)
-
-1. Check the service status and logs for obvious failures.
-2. Roll back to a previous working release if a recent change introduced a regression.
-3. If a user is impacted, create a short incident note with the job ID and failing request details.
-4. If the job store was wiped, notify users that job history was lost and suggest re-submitting their requests.
 
 - Instrument the service (e.g., Prometheus) to track:
   - Job success/failure counts
   - HTTP call latency to Nexus/IQ
   - Number of active workers and queue length
+
+## Maintenance Checklist (Quick)
+
+Use this checklist for common maintenance tasks during deployments and on-call rotations.
+
+1.  Verify config values and secrets in `config/.env`.
+2.  Validate `config/organizations.json` and `config/packageManager.json` contain required mappings.
+3.  Deploy service and confirm it starts without errors.
+4.  Check the health endpoint and ensure the server responds.
+5.  Tail logs and look for unexpected errors or high error rates.
+6.  If the JobStore is reset, re-run any necessary job submission tests.
+
+## Credential Rotation
+
+1.  Update credentials in `config/.env` for Nexus, IQ, or API token.
+2.  Restart the service (or use rolling restart in clustered environments).
+3.  Confirm successful API calls to Nexus/IQ in logs and that jobs run successfully.
+
+## Handling a Production Incident (high level)
+
+1.  Check the service status and logs for obvious failures.
+2.  Roll back to a previous working release if a recent change introduced a regression.
+3.  If a user is impacted, create a short incident note with the job ID and failing request details.
+4.  If the job store was wiped, notify users that job history was lost and suggest re-submitting their requests.
 
 ## API Endpoints
 
@@ -169,13 +169,15 @@ DELETE /repositories
 
 The request body follows the same format as `POST /repositories`.
 
+> **Note:** For `DELETE /repositories` the API validates the payload strictly: a delete request may either target a specific repository (`Shared=false`, `AppID` required, `PackageManager` required) or perform an offboarding-style cleanup (`Shared=true`, `AppID` required, `PackageManager` must be empty). A `DELETE` with `Shared=true` and an empty `AppID` is rejected by the API; use the offboarding flow to remove shared access, clean up app artifacts, and automatically revoke the Owner role in the associated IQ Server organization.
+
 3. Get a job status (polling):
 
 ```http
 GET /jobs/:jobID
 ```
 
-The GET returns the job object with totals and any failed requests. Response field names are camelCase.
+The `GET` returns the job object with totals and any failed requests. Response field names are `camelCase`.
 
 Example `curl` usage (create):
 
@@ -189,9 +191,7 @@ curl -X POST \
 
 ## Maintainers Guide
 
-This section contains clear, actionable instructions for maintainers and operators. It includes a runbook, quick troubleshooting steps, and developer guidance. For the user-facing API reference, see `docs/user.en.md`.
-
-_See the top-level Table of Contents for links and sections._
+This section contains clear, actionable instructions for maintainers and operators. For the user-facing API reference, see `docs/user.en.md`.
 
 ## Project Overview
 
@@ -273,7 +273,6 @@ Required fields: `OrganizationName`, `LdapUsername`, `PackageManager`. `Shared` 
   - Fans out processing (concurrent workers per request).
   - Aggregates results and updates the `JobStore`.
 - **`Handlers`**:
-
   - `POST /repositories`: Validates input, enqueues job, returns 202 Accepted.
   - `GET /jobs/:id`: Polling endpoint for job status.
 
@@ -325,7 +324,7 @@ The system automatically generates names based on the configuration:
 
 ### 2. Async Job Processing
 
-1.  **Validation**: The API validates payload structure, organization existence, and package manager support _synchronously_.
+1.  **Validation**: The API validates payload structure, organization existence, and package manager support **synchronously**.
 2.  **Queueing**: A Job ID is created in memory.
 3.  **Execution**:
     - Resources (Nexus) are processed.
@@ -391,18 +390,18 @@ This file drives the logic for creating repositories. You can add support for ne
 
 Maps human-readable names to IQ Server UUIDs.
 
-```json
+````json
 {
   "Department A": "7b2f3034e08445fe9bb02ce5565f98b5"
-}
-```
+}```
+
 
 ## Development & Building
 
 ### Prerequisites
 
-- Go 1.21+
-- Make (optional, for build scripts)
+-   Go 1.21+
+-   Make (optional, for build scripts)
 
 ### Adding a New Package Manager
 
@@ -422,7 +421,7 @@ make all
 # bin/sra-darwin-arm64
 # bin/sra-linux-amd64
 # bin/sra-windows-amd64.exe
-```
+````
 
 ### Running Locally
 

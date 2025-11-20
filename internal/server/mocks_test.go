@@ -18,6 +18,14 @@ func (m *MockNexusClient) GetRepository(name string) (*client.Repository, error)
 	return args.Get(0).(*client.Repository), args.Error(1)
 }
 
+func (m *MockNexusClient) GetRepositories() ([]client.Repository, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]client.Repository), args.Error(1)
+}
+
 func (m *MockNexusClient) CreateProxyRepository(config *config.OperationConfig) error {
 	args := m.Called(config)
 	return args.Error(0)
@@ -34,6 +42,14 @@ func (m *MockNexusClient) GetPrivilege(name string) (*client.Privilege, error) {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*client.Privilege), args.Error(1)
+}
+
+func (m *MockNexusClient) GetPrivileges() ([]client.Privilege, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]client.Privilege), args.Error(1)
 }
 
 func (m *MockNexusClient) CreatePrivilege(config *config.OperationConfig) error {
