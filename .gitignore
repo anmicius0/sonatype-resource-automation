@@ -1,0 +1,23 @@
+# Binaries for programs and plugins
+bin/
+sra-*
+
+
+# Local Development
+.env
+organizations.ctbc.json
+organizations.json
+
+# Logs
+*.log
+app.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+.DS_Store?

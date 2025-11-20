@@ -1,0 +1,180 @@
+{
+  "apt": {
+    "defaultURL": "https://archive.ubuntu.com/ubuntu/",
+    "defaultConfig": {
+      "distribution": "focal",
+      "flat": false
+    },
+    "apiEndpoint": {
+      "path": "/v1/repositories/apt/proxy",
+      "formatSpecificConfig": {
+        "apt": {
+          "distribution": "focal",
+          "flat": false
+        }
+      }
+    }
+  },
+  "cocoapods": {
+    "defaultURL": "https://cdn.cocoapods.org/",
+    "apiEndpoint": {
+      "path": "/v1/repositories/cocoapods/proxy"
+    }
+  },
+  "conda": {
+    "defaultURL": "https://repo.anaconda.com/pkgs/main/",
+    "apiEndpoint": {
+      "path": "/v1/repositories/conda/proxy"
+    }
+  },
+  "conan": {
+    "defaultURL": "https://center.conan.io",
+    "apiEndpoint": {
+      "path": "/v1/repositories/conan/proxy",
+      "formatSpecificConfig": {
+        "conanProxy": {
+          "conanVersion": "V1"
+        }
+      }
+    }
+  },
+  "docker": {
+    "defaultURL": "https://registry-1.docker.io/",
+    "defaultConfig": {
+      "v1Enabled": false,
+      "forceBasicAuth": true,
+      "httpPort": null,
+      "httpsPort": null,
+      "subdomain": null
+    },
+    "apiEndpoint": {
+      "path": "/v1/repositories/docker/proxy",
+      "formatSpecificConfig": {
+        "docker": {
+          "v1Enabled": false,
+          "forceBasicAuth": true,
+          "httpPort": null,
+          "httpsPort": null,
+          "subdomain": null
+        },
+        "dockerProxy": {
+          "indexType": "HUB",
+          "cacheForeignLayers": false,
+          "foreignLayerURLWhitelist": []
+        }
+      }
+    }
+  },
+  "go": {
+    "defaultURL": "https://proxy.golang.org",
+    "apiEndpoint": {
+      "path": "/v1/repositories/go/proxy"
+    }
+  },
+  "helm": {
+    "defaultURL": "https://charts.helm.sh/stable",
+    "apiEndpoint": {
+      "path": "/v1/repositories/helm/proxy"
+    }
+  },
+  "maven": {
+    "defaultURL": "https://repo1.maven.org/maven2/",
+    "defaultConfig": {
+      "versionPolicy": "RELEASE",
+      "layoutPolicy": "STRICT",
+      "contentDisposition": "ATTACHMENT"
+    },
+    "apiEndpoint": {
+      "path": "/v1/repositories/maven/proxy",
+      "formatSpecificConfig": {
+        "maven": {
+          "versionPolicy": "RELEASE",
+          "layoutPolicy": "STRICT",
+          "contentDisposition": "ATTACHMENT"
+        }
+      }
+    }
+  },
+  "npm": {
+    "defaultURL": "https://registry.npmjs.org",
+    "defaultConfig": {
+      "removeQuarantined": false
+    },
+    "apiEndpoint": {
+      "path": "/v1/repositories/npm/proxy",
+      "formatSpecificConfig": {
+        "npm": {
+          "removeQuarantined": false
+        }
+      }
+    }
+  },
+  "nuget": {
+    "defaultURL": "https://api.nuget.org/v3/index.json",
+    "defaultConfig": {
+      "queryCacheItemMaxAge": 3600,
+      "nugetVersion": "V3"
+    },
+    "apiEndpoint": {
+      "path": "/v1/repositories/nuget/proxy",
+      "formatSpecificConfig": {
+        "nugetProxy": {
+          "queryCacheItemMaxAge": 3600,
+          "nugetVersion": "V3"
+        }
+      }
+    }
+  },
+  "p2": {
+    "defaultURL": "https://download.eclipse.org/releases/latest/",
+    "apiEndpoint": {
+      "path": "/v1/repositories/p2/proxy"
+    }
+  },
+  "pypi": {
+    "defaultURL": "https://pypi.org/simple",
+    "defaultConfig": {
+      "removeQuarantined": true
+    },
+    "apiEndpoint": {
+      "path": "/v1/repositories/pypi/proxy",
+      "formatSpecificConfig": {
+        "pypi": {
+          "removeQuarantined": true
+        }
+      }
+    }
+  },
+  "r": {
+    "defaultURL": "https://cloud.r-project.org",
+    "apiEndpoint": {
+      "path": "/v1/repositories/r/proxy"
+    }
+  },
+  "rubygems": {
+    "defaultURL": "https://rubygems.org",
+    "apiEndpoint": {
+      "path": "/v1/repositories/rubygems/proxy"
+    }
+  },
+  "yum": {
+    "defaultURL": "http://mirror.centos.org/centos/",
+    "defaultConfig": {
+      "repodataDepth": 0,
+      "deployPolicy": "STRICT"
+    },
+    "apiEndpoint": {
+      "path": "/v1/repositories/yum/proxy",
+      "formatSpecificConfig": {
+        "yumSigning": {
+          "keypair": null,
+          "passphrase": null
+        },
+        "yum": {
+          "repodataDepth": 0,
+          "deployPolicy": "STRICT"
+        }
+      }
+    }
+  }
+}
